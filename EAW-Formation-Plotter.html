@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formation Plotter — Squadron_Offsets Editor</title>
+<style>
+  :root{
+    --bg:#0a0d12;
+    --panel:#11151c;
+    --panel-2:#161b24;
+    --line:rgba(255,255,255,0.08);
+    --line-strong:rgba(255,255,255,0.18);
+    --text:#dde3ea;
+    --text-dim:#7d8696;
+    --text-faint:#525a68;
+    --amber:#e8a33d;
+    --amber-soft:rgba(232,163,61,0.30);
+    --cyan:#52d6c8;
+    --cyan-soft:rgba(82,214,200,0.28);
+    --red:#e2596b;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+  ::selection{background:var(--amber-soft);}
+
+  button{
+    font-family:var(--sans);
+    background:var(--panel-2);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:6px 10px;
+    font-size:11.5px;
+    letter-spacing:0.02em;
+    cursor:pointer;
+    transition:border-color .12s, color .12s;
+  }
+  button:hover{border-color:var(--line-strong);}
+  button:active{transform:translateY(1px);}
+  button.accent{border-color:var(--amber-soft);color:var(--amber);}
+  button.accent:hover{border-color:var(--amber);}
+  button.cyan{border-color:var(--cyan-soft);color:var(--cyan);}
+  button.cyan:hover{border-color:var(--cyan);}
+  button.danger{color:var(--red);}
+  button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:4px 6px;}
+  button.ghost:hover{color:var(--text);}
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--cyan); outline-offset:1px;
+  }
+  button.small{padding:3px 7px;font-size:10.5px;}
+  button[disabled]{opacity:.35;cursor:not-allowed;}
+
+  input[type=text], input[type=number], select, textarea{
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:3px;
+    padding:5px 7px;
+    font-family:var(--mono);
+    font-size:11.5px;
+  }
+  input[type=number]{width:64px;}
+  textarea{font-family:var(--mono);font-size:11px;line-height:1.5;resize:none;width:100%;}
+  label.field{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase;}
+
+  .eyebrow{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);font-weight:600;}
+  .panel-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);font-weight:700;margin:0;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:14px;
+    padding:9px 16px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, var(--panel), var(--bg));
+    flex:0 0 auto;
+  }
+  .brand{display:flex;flex-direction:column;line-height:1.15;margin-right:8px;}
+  .brand .name{font-size:14px;font-weight:800;letter-spacing:.04em;color:var(--text);}
+  .brand .name .acc{color:var(--amber);}
+  .brand .sub{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);}
+  .topbar .spacer{flex:1;}
+  .topbar .group{display:flex;gap:6px;align-items:center;}
+
+  /* ---------- layout ---------- */
+  .layout{flex:1;display:grid;grid-template-columns:248px 1fr 300px;min-height:0;}
+  aside, main{min-height:0;overflow:hidden;display:flex;flex-direction:column;}
+  .roster{border-right:1px solid var(--line);background:var(--panel);}
+  .inspector{border-left:1px solid var(--line);background:var(--panel);}
+  .section{padding:12px 14px;border-bottom:1px solid var(--line);}
+  .section.scroll{overflow-y:auto;}
+  .roster .section.grow{flex:1;}
+  .row-between{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+
+  /* ---------- roster list ---------- */
+  #rosterList{display:flex;flex-direction:column;gap:5px;}
+  .roster-item{
+    border:1px solid var(--line);border-radius:4px;padding:7px 9px;
+    cursor:pointer;background:var(--panel-2);
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .roster-item:hover{border-color:var(--line-strong);}
+  .roster-item.selected{border-color:var(--amber);background:rgba(232,163,61,0.08);}
+  .roster-item .ri-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;}
+  .roster-item .ri-name{font-size:11.5px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .roster-item .ri-meta{font-size:10px;color:var(--text-faint);font-family:var(--mono);}
+  .roster-item .ri-actions{display:flex;gap:3px;}
+
+  .gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+  .gen-grid label.field{grid-column:span 1;}
+
+  /* ---------- viewport ---------- */
+  .view-row{flex:1;display:flex;gap:1px;background:var(--line);min-height:0;}
+  .view-panel{flex:1;position:relative;background:radial-gradient(circle at 50% 50%, #0d1118 0%, #090b0f 100%);min-width:0;}
+  .view-panel canvas{display:block;width:100%;height:100%;}
+  .view-label{position:absolute;top:8px;left:10px;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);font-family:var(--mono);pointer-events:none;}
+  .view-hint{position:absolute;bottom:8px;right:10px;font-size:9.5px;color:var(--text-faint);font-family:var(--mono);pointer-events:none;}
+
+  .toolbar{
+    flex:0 0 auto;display:flex;align-items:center;gap:10px;
+    padding:8px 14px;border-top:1px solid var(--line);background:var(--panel);
+    flex-wrap:wrap;
+  }
+  .toolbar .divider{width:1px;height:18px;background:var(--line);}
+
+  /* ---------- inspector ---------- */
+  table.points{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+  table.points th{text-align:left;color:var(--text-faint);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;padding:4px 4px;border-bottom:1px solid var(--line);}
+  table.points td{padding:3px 3px;border-bottom:1px solid var(--line);}
+  table.points tr.selected td{background:rgba(82,214,200,0.07);}
+  table.points input[type=number]{width:56px;padding:3px 4px;font-size:10.5px;}
+  .idx-cell{color:var(--text-faint);width:18px;}
+  .pts-wrap{max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;}
+
+  .footer-status{
+    flex:0 0 auto;padding:6px 16px;border-top:1px solid var(--line);
+    font-size:10px;color:var(--text-faint);font-family:var(--mono);
+    background:var(--bg);
+  }
+
+  /* ---------- scrollbars ---------- */
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:4px;}
+
+  .hidden{display:none !important;}
+
+  @media (max-width: 980px){
+    .layout{grid-template-columns:1fr;grid-auto-rows:auto;overflow-y:auto;}
+    aside, main{height:auto;}
+    .view-row{min-height:420px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="name">FORMATION<span class="acc">·</span>PLOTTER</div>
+    <div class="sub">Squadron_Offsets editor · EaW modding tool</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="group">
+    <button id="btnImportToggle">Import XML</button>
+    <button id="btnExportAll" class="cyan">Download all formations</button>
+    <button id="btnResetLibrary" class="danger">Reset library</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ROSTER -->
+  <aside class="roster">
+    <div class="section">
+      <div class="row-between">
+        <h3 class="panel-title">Formations</h3>
+        <button id="btnNewFormation" class="accent small">+ New</button>
+      </div>
+      <div id="rosterList"></div>
+    </div>
+
+    <div id="importPanel" class="section hidden">
+      <h3 class="panel-title" style="margin-bottom:8px;">Import XML</h3>
+      <textarea id="importText" rows="6" placeholder="Paste &lt;Squadron_Offsets&gt; XML here, with a &#10;&lt;!-- **** Name **** --&gt; header above each group."></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button id="btnImportAppend" class="accent small">Append parsed</button>
+        <button id="btnImportReplace" class="danger small">Replace all</button>
+      </div>
+    </div>
+
+    <div class="section scroll grow">
+      <h3 class="panel-title" style="margin-bottom:6px;">Generate formation</h3>
+      <label class="field">Shape
+        <select id="genShape"></select>
+      </label>
+      <div class="gen-grid" id="genParams"></div>
+      <button id="btnGenerate" class="accent" style="margin-top:10px;width:100%;">Generate new formation</button>
+    </div>
+  </aside>
+
+  <!-- VIEWPORT -->
+  <main>
+    <div class="view-row">
+      <div class="view-panel" id="topPanel">
+        <canvas id="topCanvas"></canvas>
+        <div class="view-label">Top view — X forward / Y lateral</div>
+        <div class="view-hint">scroll = zoom · drag empty space = pan</div>
+      </div>
+      <div class="view-panel" id="sidePanel">
+        <canvas id="sideCanvas"></canvas>
+        <div class="view-label">Side view — X forward / Z vertical</div>
+        <div class="view-hint">scroll = zoom · drag empty space = pan</div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button id="btnFit" class="small">Fit view</button>
+      <button id="btnZoomOut" class="small">−</button>
+      <button id="btnZoomIn" class="small">+</button>
+      <div class="divider"></div>
+      <button id="btnAddMode" class="small">Add point: OFF</button>
+      <button id="btnMirror" class="small">Mirror selected ↔ Y</button>
+      <button id="btnDeletePoint" class="small danger">Delete selected</button>
+      <div class="divider"></div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:6px;">
+        Scale factor
+        <input type="number" id="scaleFactor" value="1.0" step="0.1" style="width:56px;">
+      </label>
+      <button id="btnApplyScale" class="small">Apply to all points</button>
+    </div>
+  </main>
+
+  <!-- INSPECTOR -->
+  <aside class="inspector">
+    <div class="section">
+      <h3 class="panel-title" style="margin-bottom:8px;">Formation</h3>
+      <label class="field">Name
+        <input type="text" id="formationName" placeholder="Unnamed formation">
+      </label>
+      <div style="margin-top:8px;font-size:10px;color:var(--text-faint);font-family:var(--mono);" id="formationMeta"></div>
+    </div>
+
+    <div class="section scroll" style="flex:1;">
+      <div class="row-between">
+        <h3 class="panel-title">Points</h3>
+        <button id="btnAddPointOrigin" class="small accent">+ Add at origin</button>
+      </div>
+      <div class="pts-wrap">
+        <table class="points">
+          <thead><tr><th></th><th>X</th><th>Y</th><th>Z</th><th></th></tr></thead>
+          <tbody id="pointsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="row-between">
+        <h3 class="panel-title">Export</h3>
+        <div style="display:flex;gap:5px;">
+          <button id="btnCopyXml" class="small cyan">Copy</button>
+          <button id="btnDownloadOne" class="small cyan">Download</button>
+        </div>
+      </div>
+      <textarea id="exportText" rows="7" readonly></textarea>
+    </div>
+  </aside>
+
+</div>
+
+<div class="footer-status">
+  Drag a marker to move it · Delete/Backspace removes the selected point · Leader (◇) sits at 0,0,0 — all offsets are relative to it.
+</div>
+
+<script>
+/* =========================================================================
+   DATA: seed library — original 8 presets + 6 new ones, same XML dialect
+   ========================================================================= */
+const INITIAL_XML = `
+<!-- **** Wide, strong, 5x2 formation for heavy gunships and high health units **** -->
+
+		<Squadron_Offsets>300.0,10.0,-100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>300.0,-10.0,-100.0</Squadron_Offsets>
+
+ 		<Squadron_Offsets>50.0,-260.0,-20.0</Squadron_Offsets>
+ 		<Squadron_Offsets>50.0,-240.0,-20.0</Squadron_Offsets>
+
+ 		<Squadron_Offsets>50.0,260.0,-20.0</Squadron_Offsets>
+		<Squadron_Offsets>50.0,240.0,-20.0</Squadron_Offsets>
+
+ 		<Squadron_Offsets>-300.0,-100.0,100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>-300.0,-80.0,100.0</Squadron_Offsets>
+
+ 		<Squadron_Offsets>-300.0,100.0,100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>-300.0,80.0,100.0</Squadron_Offsets>
+
+
+<!-- **** Double V, excellent for bomber units **** -->
+
+		<Squadron_Offsets>250.0,0.0,-100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>200.0,-40.0,-100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>200.0,40.0,-100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>150.0,-80.0,-100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>150.0,80.0,-100.0</Squadron_Offsets>
+
+		<Squadron_Offsets>-250.0,0.0,100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>-300.0,-40.0,100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>-300.0,40.0,100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>-350.0,-80.0,100.0</Squadron_Offsets>
+ 		<Squadron_Offsets>-350.0,80.0,100.0</Squadron_Offsets>
+
+
+<!-- **** rando formation in a sphere-ish pattern, good for weak, unorganized fighters **** -->
+
+		<Squadron_Offsets>90.0,0.0,-45.0</Squadron_Offsets>
+		<Squadron_Offsets>-90.0,0.0,-45.0</Squadron_Offsets>
+		<Squadron_Offsets>30.0,30.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>30.0,-30.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>60.0,60.0,-145.0</Squadron_Offsets>
+		<Squadron_Offsets>60.0,-60.0,-145.0</Squadron_Offsets>
+		<Squadron_Offsets>30.0,120.0,-90.0</Squadron_Offsets>
+		<Squadron_Offsets>30.0,-120.0,-90.0</Squadron_Offsets>
+		<Squadron_Offsets>-45.0,-75.0,-45.0</Squadron_Offsets>
+		<Squadron_Offsets>-45.0,75.0,-45.0</Squadron_Offsets>
+
+
+<!-- **** 5x2 line, good for frontline fighters **** -->
+
+		<Squadron_Offsets>0.0,-15.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,15.0,0.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,270.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,300.0,0.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,-270.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-300.0,0.0</Squadron_Offsets>
+
+		<Squadron_Offsets>-75.0,130.0,75.0</Squadron_Offsets>
+		<Squadron_Offsets>-75.0,160.0,75.0</Squadron_Offsets>
+
+		<Squadron_Offsets>-75.0,-130.0,75.0</Squadron_Offsets>
+		<Squadron_Offsets>-75.0,-160.0,75.0</Squadron_Offsets>
+
+
+<!-- **** Agile 3 point spearhead, good for focussing damage **** -->
+
+		<Squadron_Offsets>50.0,0.0,0.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,0.0,50.0</Squadron_Offsets>
+		<Squadron_Offsets>-50.0,0.0,100.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,0.0,150.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,43.0,-25.0</Squadron_Offsets>
+		<Squadron_Offsets>-50.0,86.0,-50.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,129.0,-75.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,-43.0,-25.0</Squadron_Offsets>
+		<Squadron_Offsets>-50.0,-86.0,-50.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,-129.0,-75.0</Squadron_Offsets>
+
+
+<!-- **** Agile 5 point spearhead, good for focussing damage **** -->
+
+		<Squadron_Offsets>60.0,0.0,80.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,0.0,160.0</Squadron_Offsets>
+
+		<Squadron_Offsets>60.0,76.0,25.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,152.0,50.0</Squadron_Offsets>
+
+		<Squadron_Offsets>60.0,47.0,-65.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,94.0,-130.0</Squadron_Offsets>
+
+		<Squadron_Offsets>60.0,-76.0,25.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-152.0,50.0</Squadron_Offsets>
+
+		<Squadron_Offsets>60.0,-47.0,-65.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-94.0,-130.0</Squadron_Offsets>
+
+
+<!-- **** Concave in close formation for lots of up-front burst, good for interceptors **** -->
+
+		<Squadron_Offsets>15.0,-33.0,0.0</Squadron_Offsets>
+  		<Squadron_Offsets>12.0,-30.0,-3.0</Squadron_Offsets>
+  		<Squadron_Offsets>12.0,-30.0,3.0</Squadron_Offsets>
+
+  		<Squadron_Offsets>15.0,33.0,0.0</Squadron_Offsets>
+  		<Squadron_Offsets>12.0,30.0,-3.0</Squadron_Offsets>
+  		<Squadron_Offsets>12.0,30.0,3.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,9.0,9.0</Squadron_Offsets>
+ 		<Squadron_Offsets>0.0,-9.0,9.0</Squadron_Offsets>
+  		<Squadron_Offsets>0.0,9.0,-9.0</Squadron_Offsets>
+  		<Squadron_Offsets>0.0,-9.0,-9.0</Squadron_Offsets>
+
+
+<!-- **** Concave in wide formation for lots of up-front burst, good for heavy, high hp/damage interceptors **** -->
+
+		<Squadron_Offsets>90.0,-300.0,0.0</Squadron_Offsets>
+  		<Squadron_Offsets>80.0,-270.0,-27.0</Squadron_Offsets>
+  		<Squadron_Offsets>80.0,-270.0,27.0</Squadron_Offsets>
+
+  		<Squadron_Offsets>90.0,300.0,0.0</Squadron_Offsets>
+  		<Squadron_Offsets>80.0,270.0,-27.0</Squadron_Offsets>
+  		<Squadron_Offsets>80.0,270.0,27.0</Squadron_Offsets>
+
+		<Squadron_Offsets>0.0,54.0,54.0</Squadron_Offsets>
+ 		<Squadron_Offsets>0.0,-54.0,54.0</Squadron_Offsets>
+  		<Squadron_Offsets>0.0,54.0,-54.0</Squadron_Offsets>
+  		<Squadron_Offsets>0.0,-54.0,-54.0</Squadron_Offsets>
+
+
+<!-- **** Echelon stagger, diagonal line good for strafing runs and avoiding wingman overlap **** -->
+
+		<Squadron_Offsets>80.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>60.0,40.0,10.0</Squadron_Offsets>
+		<Squadron_Offsets>40.0,80.0,-10.0</Squadron_Offsets>
+		<Squadron_Offsets>20.0,120.0,10.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,160.0,-10.0</Squadron_Offsets>
+		<Squadron_Offsets>-20.0,200.0,10.0</Squadron_Offsets>
+		<Squadron_Offsets>-40.0,240.0,-10.0</Squadron_Offsets>
+		<Squadron_Offsets>-60.0,280.0,10.0</Squadron_Offsets>
+
+
+<!-- **** Defensive sphere, omnidirectional escort screen for capital ships and convoys **** -->
+
+		<Squadron_Offsets>87.0,87.0,87.0</Squadron_Offsets>
+		<Squadron_Offsets>87.0,87.0,-87.0</Squadron_Offsets>
+		<Squadron_Offsets>87.0,-87.0,87.0</Squadron_Offsets>
+		<Squadron_Offsets>87.0,-87.0,-87.0</Squadron_Offsets>
+		<Squadron_Offsets>-87.0,87.0,87.0</Squadron_Offsets>
+		<Squadron_Offsets>-87.0,87.0,-87.0</Squadron_Offsets>
+		<Squadron_Offsets>-87.0,-87.0,87.0</Squadron_Offsets>
+		<Squadron_Offsets>-87.0,-87.0,-87.0</Squadron_Offsets>
+
+		<Squadron_Offsets>150.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-150.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,0.0,150.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,0.0,-150.0</Squadron_Offsets>
+
+
+<!-- **** Crescent pincer, wide flanking arc for bracketing a target from both sides **** -->
+
+		<Squadron_Offsets>0.0,-300.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-30.0,-260.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-55.0,-210.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-70.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-78.0,-75.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-80.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-78.0,75.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-70.0,150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-55.0,210.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-30.0,260.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,300.0,0.0</Squadron_Offsets>
+
+
+<!-- **** Phalanx box, dense 3x4 grid for heavy frontal assault by tanky line units **** -->
+
+		<Squadron_Offsets>100.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,-50.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,50.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-50.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,50.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,-50.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,50.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>-100.0,150.0,0.0</Squadron_Offsets>
+
+
+<!-- **** Starburst scatter, wide irregular spread to reduce AoE and flak losses on bombers **** -->
+
+		<Squadron_Offsets>220.0,140.0,60.0</Squadron_Offsets>
+		<Squadron_Offsets>-180.0,200.0,-90.0</Squadron_Offsets>
+		<Squadron_Offsets>150.0,-220.0,40.0</Squadron_Offsets>
+		<Squadron_Offsets>-90.0,-190.0,120.0</Squadron_Offsets>
+		<Squadron_Offsets>60.0,250.0,-130.0</Squadron_Offsets>
+		<Squadron_Offsets>-250.0,60.0,80.0</Squadron_Offsets>
+		<Squadron_Offsets>190.0,-90.0,-150.0</Squadron_Offsets>
+		<Squadron_Offsets>-130.0,-260.0,-30.0</Squadron_Offsets>
+		<Squadron_Offsets>280.0,-40.0,20.0</Squadron_Offsets>
+		<Squadron_Offsets>-40.0,270.0,150.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,180.0,-200.0</Squadron_Offsets>
+		<Squadron_Offsets>-220.0,-120.0,170.0</Squadron_Offsets>
+
+
+<!-- **** Trident thrust, three-pronged column formation for focused multi-axis strikes **** -->
+
+		<Squadron_Offsets>150.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>50.0,0.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>50.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,-150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>100.0,150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>50.0,150.0,0.0</Squadron_Offsets>
+		<Squadron_Offsets>0.0,150.0,0.0</Squadron_Offsets>
+`;
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+let idCounter = 1;
+const nextId = () => 'p' + (idCounter++);
+const round1 = n => Math.round(n * 10) / 10;
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+const state = {
+  formations: [],
+  selectedFormationId: null,
+  selectedPointId: null,
+  scale: 0.6,
+  topView: { cx: 0, cy: 0 },
+  sideView: { cx: 0, cy: 0 },
+  addMode: false,
+};
+
+function getSelectedFormation(){
+  return state.formations.find(f => f.id === state.selectedFormationId) || null;
+}
+function getSelectedPoint(){
+  const f = getSelectedFormation();
+  if (!f) return null;
+  return f.points.find(p => p.id === state.selectedPointId) || null;
+}
+
+/* =========================================================================
+   PARSE / SERIALIZE
+   ========================================================================= */
+function parseFormationsXML(text){
+  const blockRe = /<!--\s*\*+\s*([\s\S]*?)\s*\*+\s*-->([\s\S]*?)(?=<!--|$)/g;
+  const offsetRe = /<Squadron_Offsets>\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*<\/Squadron_Offsets>/g;
+  const out = [];
+  let m;
+  while ((m = blockRe.exec(text))) {
+    const header = m[1].replace(/\s+/g, ' ').trim();
+    const body = m[2];
+    const pts = [];
+    let om;
+    while ((om = offsetRe.exec(body))) {
+      pts.push({ id: nextId(), x: parseFloat(om[1]), y: parseFloat(om[2]), z: parseFloat(om[3]) });
+    }
+    if (header) out.push({ id: nextId(), name: header, points: pts });
+  }
+  return out;
+}
+
+function fmtNum(n){
+  let v = Math.round(n * 10) / 10;
+  if (Object.is(v, -0)) v = 0;
+  return v.toFixed(1);
+}
+function serializeFormation(f){
+  let s = `<!-- **** ${f.name || 'Unnamed formation'} **** -->\n\n`;
+  s += f.points.map(p => `\t\t<Squadron_Offsets>${fmtNum(p.x)},${fmtNum(p.y)},${fmtNum(p.z)}</Squadron_Offsets>`).join('\n');
+  s += '\n';
+  return s;
+}
+function serializeAll(forms){
+  return forms.map(serializeFormation).join('\n\n');
+}
+
+/* =========================================================================
+   SHAPE GENERATORS
+   ========================================================================= */
+function genLine(p){
+  const pts = [];
+  for (let i = 0; i < p.count; i++){
+    const y = (i - (p.count - 1) / 2) * p.spacing;
+    pts.push({ x: 0, y: round1(y), z: 0 });
+  }
+  return pts;
+}
+function genDoubleLine(p){
+  const pts = [];
+  const front = Math.ceil(p.count / 2), back = p.count - front;
+  const half = p.depth / 2;
+  for (let i = 0; i < front; i++){
+    const y = (i - (front - 1) / 2) * p.spacing;
+    pts.push({ x: half, y: round1(y), z: 0 });
+  }
+  for (let i = 0; i < back; i++){
+    const y = (i - (back - 1) / 2) * p.spacing;
+    pts.push({ x: -half, y: round1(y), z: 0 });
+  }
+  return pts;
+}
+function genWedge(p){
+  const pts = [];
+  let remaining = p.count, level = 0;
+  if (p.count % 2 === 1){ pts.push({ x: 0, y: 0, z: 0 }); remaining--; level = 1; }
+  while (remaining > 0){
+    const x = -level * p.depth, y = level * p.spacing;
+    pts.push({ x: round1(x), y: round1(y), z: 0 });
+    remaining--;
+    if (remaining > 0){ pts.push({ x: round1(x), y: round1(-y), z: 0 }); remaining--; }
+    level++;
+  }
+  return pts;
+}
+function genBoxGrid(p){
+  const pts = [];
+  const cols = Math.ceil(Math.sqrt(p.count)), rows = Math.ceil(p.count / cols);
+  let idx = 0;
+  for (let r = 0; r < rows; r++){
+    for (let c = 0; c < cols; c++){
+      if (idx >= p.count) break;
+      const x = (r - (rows - 1) / 2) * p.spacing;
+      const y = (c - (cols - 1) / 2) * p.spacing;
+      pts.push({ x: round1(x), y: round1(y), z: 0 });
+      idx++;
+    }
+  }
+  return pts;
+}
+function genDisc(p){
+  const pts = [];
+  for (let i = 0; i < p.count; i++){
+    const a = (i / p.count) * Math.PI * 2;
+    pts.push({ x: round1(p.radius * Math.cos(a)), y: round1(p.radius * Math.sin(a)), z: 0 });
+  }
+  return pts;
+}
+function genSphere(p){
+  const pts = [];
+  const n = p.count;
+  for (let i = 0; i < n; i++){
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    const phi = Math.acos(1 - 2 * t);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+    pts.push({
+      x: round1(p.radius * Math.sin(phi) * Math.cos(theta)),
+      y: round1(p.radius * Math.sin(phi) * Math.sin(theta)),
+      z: round1(p.radius * Math.cos(phi)),
+    });
+  }
+  return pts;
+}
+function genEchelon(p){
+  const pts = [];
+  for (let i = 0; i < p.count; i++){
+    pts.push({ x: round1(-i * p.depth), y: round1(i * p.spacing), z: 0 });
+  }
+  return pts;
+}
+function genCrescent(p){
+  const pts = [];
+  const span = 160 * Math.PI / 180;
+  for (let i = 0; i < p.count; i++){
+    const t = p.count > 1 ? i / (p.count - 1) : 0.5;
+    const a = (t - 0.5) * span;
+    pts.push({ x: round1(-p.depth * Math.cos(a)), y: round1(p.radius * Math.sin(a)), z: 0 });
+  }
+  return pts;
+}
+
+const SHAPE_DEFS = {
+  line:     { label: 'Line (single row)',      params: { count: 9,  spacing: 35 },              gen: genLine },
+  double:   { label: 'Double line (2 rows)',    params: { count: 10, spacing: 35, depth: 60 },   gen: genDoubleLine },
+  wedge:    { label: 'Wedge / V',               params: { count: 9,  spacing: 40, depth: 50 },   gen: genWedge },
+  grid:     { label: 'Box grid',                params: { count: 9,  spacing: 60 },              gen: genBoxGrid },
+  disc:     { label: 'Disc (flat ring)',        params: { count: 10, radius: 200 },              gen: genDisc },
+  sphere:   { label: 'Sphere (escort screen)',  params: { count: 12, radius: 180 },              gen: genSphere },
+  echelon:  { label: 'Echelon stagger',         params: { count: 8,  spacing: 40, depth: 25 },   gen: genEchelon },
+  crescent: { label: 'Crescent pincer',         params: { count: 11, radius: 280, depth: 80 },   gen: genCrescent },
+};
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+state.formations = parseFormationsXML(INITIAL_XML);
+state.selectedFormationId = state.formations.length ? state.formations[0].id : null;
+
+/* =========================================================================
+   VIEW / FIT
+   ========================================================================= */
+function fitView(){
+  const f = getSelectedFormation();
+  const topRect = document.getElementById('topPanel').getBoundingClientRect();
+  const sideRect = document.getElementById('sidePanel').getBoundingClientRect();
+  if (!f || f.points.length === 0){
+    state.scale = 0.6; state.topView = { cx: 0, cy: 0 }; state.sideView = { cx: 0, cy: 0 };
+    return;
+  }
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  f.points.forEach(p=>{
+    minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+    minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+    minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z);
+  });
+  minX=Math.min(minX,0); maxX=Math.max(maxX,0);
+  minY=Math.min(minY,0); maxY=Math.max(maxY,0);
+  minZ=Math.min(minZ,0); maxZ=Math.max(maxZ,0);
+  const spanX = (maxX-minX) || 80, spanY=(maxY-minY)||80, spanZ=(maxZ-minZ)||80;
+  const pad = 1.35;
+  const sTopX = topRect.height / (spanX*pad);
+  const sTopY = topRect.width / (spanY*pad);
+  const sSideX = sideRect.width / (spanX*pad);
+  const sSideZ = sideRect.height / (spanZ*pad);
+  let scale = Math.min(sTopX,sTopY,sSideX,sSideZ);
+  if (!isFinite(scale) || scale<=0) scale=0.6;
+  scale = Math.min(scale, 3);
+  state.scale = scale;
+  state.topView = { cx:(minY+maxY)/2, cy:(minX+maxX)/2 };
+  state.sideView = { cx:(minX+maxX)/2, cy:(minZ+maxZ)/2 };
+}
+
+/* =========================================================================
+   PROJECTION
+   ========================================================================= */
+function topProj(p, view, W, H, scale){
+  return { sx: W/2 + (p.y - view.cx)*scale, sy: H/2 - (p.x - view.cy)*scale };
+}
+function sideProj(p, view, W, H, scale){
+  return { sx: W/2 + (p.x - view.cx)*scale, sy: H/2 - (p.z - view.cy)*scale };
+}
+function screenToWorldTop(pos, view, W, H, scale){
+  return { x: view.cy + (H/2 - pos.y)/scale, y: view.cx + (pos.x - W/2)/scale };
+}
+function screenToWorldSide(pos, view, W, H, scale){
+  return { x: view.cx + (pos.x - W/2)/scale, z: view.cy + (H/2 - pos.y)/scale };
+}
+
+function niceStep(scale){
+  const candidates=[5,10,20,25,50,100,200,250,500,1000,2000,5000];
+  for (const c of candidates) if (c*scale>=42) return c;
+  return candidates[candidates.length-1];
+}
+
+function getCanvasCtx(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width));
+  const h = Math.max(1, Math.floor(rect.height));
+  if (canvas.width !== Math.floor(w*dpr) || canvas.height !== Math.floor(h*dpr)){
+    canvas.width = Math.floor(w*dpr);
+    canvas.height = Math.floor(h*dpr);
+  }
+  canvas.style.width = w+'px'; canvas.style.height = h+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function drawGenericView(canvas, view, proj, axisLabel1, axisLabel2, invX){
+  const { ctx, w, h } = getCanvasCtx(canvas);
+  ctx.clearRect(0,0,w,h);
+  const scale = state.scale;
+  const f = getSelectedFormation();
+
+  // grid
+  const step = niceStep(scale);
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.lineWidth = 1;
+
+  // vertical lines: constant "axis1" (mapped via sx)
+  const a1min = view.cx - (w/2)/scale, a1max = view.cx + (w/2)/scale;
+  let startA1 = Math.floor(a1min/step)*step;
+  for (let k=startA1; k<=a1max; k+=step){
+    const sx = w/2 + (k - view.cx)*scale;
+    ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,h); ctx.stroke();
+    if (Math.abs(k) > 0.01) ctx.fillText(Math.round(k), sx+3, h-6);
+  }
+  // horizontal lines: constant "axis2" (mapped via sy)
+  const a2min = view.cy - (h/2)/scale, a2max = view.cy + (h/2)/scale;
+  let startA2 = Math.floor(a2min/step)*step;
+  for (let k=startA2; k<=a2max; k+=step){
+    const sy = h/2 - (k - view.cy)*scale;
+    ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(w,sy); ctx.stroke();
+    if (Math.abs(k) > 0.01) ctx.fillText(Math.round(k), 4, sy-3);
+  }
+
+  // origin crosshair + range rings
+  const origin = proj({x:0,y:0,z:0}, view, w, h, scale);
+  ctx.strokeStyle = 'rgba(232,163,61,0.18)';
+  for (let r=1; r<=4; r++){
+    ctx.beginPath();
+    ctx.arc(origin.sx, origin.sy, step*scale*r, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.moveTo(0,origin.sy); ctx.lineTo(w,origin.sy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(origin.sx,0); ctx.lineTo(origin.sx,h); ctx.stroke();
+
+  if (!f) { return; }
+
+  // points
+  f.points.forEach((p, i) => {
+    const pos = proj(p, view, w, h, scale);
+    const selected = p.id === state.selectedPointId;
+    ctx.save();
+    if (proj === topProj){
+      // triangle pointing toward +X (forward = up on screen)
+      ctx.translate(pos.sx,pos.sy);
+      ctx.beginPath();
+      ctx.moveTo(0,-7); ctx.lineTo(6,6); ctx.lineTo(-6,6); ctx.closePath();
+      ctx.fillStyle = selected ? '#52d6c8' : '#aab3c2';
+      ctx.strokeStyle = selected ? '#52d6c8' : 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(pos.sx,pos.sy, selected?7:5, 0, Math.PI*2);
+      ctx.fillStyle = selected ? '#52d6c8' : '#aab3c2';
+      ctx.strokeStyle = selected ? '#9af0e6' : 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = selected ? '#9af0e6' : '#7d8696';
+    ctx.font = '9.5px ui-monospace, monospace';
+    ctx.fillText(String(i+1), pos.sx+9, pos.sy-8);
+  });
+
+  // leader marker with subtle pulse
+  let pulse = 0;
+  if (!prefersReducedMotion){
+    const t = (Date.now()%2200)/2200;
+    pulse = 3*Math.sin(t*Math.PI*2);
+  }
+  ctx.save();
+  ctx.translate(origin.sx, origin.sy);
+  ctx.rotate(Math.PI/4);
+  const R = 9+pulse;
+  ctx.beginPath();
+  ctx.rect(-R,-R,R*2,R*2);
+  ctx.fillStyle = 'rgba(232,163,61,0.16)';
+  ctx.strokeStyle = '#e8a33d';
+  ctx.lineWidth = 1.5;
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = '#e8a33d';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.fillText('LEADER', origin.sx+12, origin.sy+4);
+}
+
+function renderCanvasesOnly(){
+  drawGenericView(document.getElementById('topCanvas'), state.topView, topProj, 'Y', 'X');
+  drawGenericView(document.getElementById('sideCanvas'), state.sideView, sideProj, 'X', 'Z');
+}
+
+/* =========================================================================
+   ROSTER / TABLE / EXPORT RENDERING
+   ========================================================================= */
+const pendingDeleteIds = new Set();
+
+function rebuildRosterList(){
+  const list = document.getElementById('rosterList');
+  list.innerHTML = '';
+  state.formations.forEach(f=>{
+    const item = document.createElement('div');
+    item.className = 'roster-item' + (f.id===state.selectedFormationId ? ' selected' : '');
+    item.innerHTML = `
+      <div class="ri-top">
+        <div class="ri-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+        <div class="ri-actions">
+          <button class="ghost small" data-act="dup" title="Duplicate">⧉</button>
+          <button class="ghost small" data-act="del" title="Delete">${pendingDeleteIds.has(f.id)?'Sure?':'✕'}</button>
+        </div>
+      </div>
+      <div class="ri-meta">${f.points.length} point${f.points.length===1?'':'s'}</div>
+    `;
+    item.addEventListener('click', (e)=>{
+      const actBtn = e.target.closest('button');
+      if (actBtn){
+        e.stopPropagation();
+        if (actBtn.dataset.act==='dup') duplicateFormation(f.id);
+        if (actBtn.dataset.act==='del') handleDeleteFormation(f.id);
+        return;
+      }
+      selectFormation(f.id);
+    });
+    list.appendChild(item);
+  });
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function rebuildPointsTable(){
+  const tbody = document.getElementById('pointsBody');
+  tbody.innerHTML = '';
+  const f = getSelectedFormation();
+  if (!f) return;
+  f.points.forEach((p,i)=>{
+    const tr = document.createElement('tr');
+    tr.className = p.id===state.selectedPointId ? 'selected' : '';
+    tr.innerHTML = `
+      <td class="idx-cell">${i+1}</td>
+      <td><input type="number" step="1" value="${p.x}" data-id="${p.id}" data-axis="x"></td>
+      <td><input type="number" step="1" value="${p.y}" data-id="${p.id}" data-axis="y"></td>
+      <td><input type="number" step="1" value="${p.z}" data-id="${p.id}" data-axis="z"></td>
+      <td><button class="ghost small" data-id="${p.id}" data-act="delpt">✕</button></td>
+    `;
+    tr.addEventListener('click', (e)=>{
+      if (e.target.tagName==='INPUT' || e.target.dataset.act==='delpt') return;
+      state.selectedPointId = p.id;
+      renderAll();
+    });
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const pt = f.points.find(pp=>pp.id===inp.dataset.id);
+      if (!pt) return;
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) pt[inp.dataset.axis] = v;
+      renderCanvasesOnly();
+      updateExportText();
+    });
+    inp.addEventListener('focus', ()=>{
+      state.selectedPointId = inp.dataset.id;
+      renderCanvasesOnly();
+      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('selected'));
+      inp.closest('tr').classList.add('selected');
+    });
+  });
+  tbody.querySelectorAll('button[data-act="delpt"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      f.points = f.points.filter(pp=>pp.id!==btn.dataset.id);
+      if (state.selectedPointId===btn.dataset.id) state.selectedPointId=null;
+      renderAll();
+    });
+  });
+}
+
+function updateExportText(){
+  const f = getSelectedFormation();
+  document.getElementById('exportText').value = f ? serializeFormation(f) : '';
+  document.getElementById('formationMeta').textContent = f ? `${f.points.length} point(s) · id ${f.id}` : 'No formation selected';
+}
+
+function syncFormationNameField(){
+  const f = getSelectedFormation();
+  document.getElementById('formationName').value = f ? f.name : '';
+}
+
+function renderAll(){
+  rebuildRosterList();
+  rebuildPointsTable();
+  updateExportText();
+  syncFormationNameField();
+  renderCanvasesOnly();
+}
+
+/* =========================================================================
+   FORMATION CRUD
+   ========================================================================= */
+function selectFormation(id){
+  state.selectedFormationId = id;
+  state.selectedPointId = null;
+  fitView();
+  renderAll();
+}
+function newFormation(){
+  const f = { id: nextId(), name: 'New formation', points: [] };
+  state.formations.push(f);
+  selectFormation(f.id);
+}
+function duplicateFormation(id){
+  const src = state.formations.find(f=>f.id===id);
+  if (!src) return;
+  const copy = { id: nextId(), name: src.name + ' (copy)', points: src.points.map(p=>({id:nextId(),x:p.x,y:p.y,z:p.z})) };
+  const idx = state.formations.findIndex(f=>f.id===id);
+  state.formations.splice(idx+1,0,copy);
+  selectFormation(copy.id);
+}
+function handleDeleteFormation(id){
+  if (pendingDeleteIds.has(id)){
+    state.formations = state.formations.filter(f=>f.id!==id);
+    pendingDeleteIds.delete(id);
+    if (state.selectedFormationId===id){
+      state.selectedFormationId = state.formations.length ? state.formations[0].id : null;
+      state.selectedPointId = null;
+      fitView();
+    }
+    renderAll();
+  } else {
+    pendingDeleteIds.add(id);
+    rebuildRosterList();
+    setTimeout(()=>{ pendingDeleteIds.delete(id); rebuildRosterList(); }, 3000);
+  }
+}
+
+/* =========================================================================
+   GENERATOR PANEL
+   ========================================================================= */
+const genShapeSelect = document.getElementById('genShape');
+Object.entries(SHAPE_DEFS).forEach(([key,def])=>{
+  const opt = document.createElement('option');
+  opt.value = key; opt.textContent = def.label;
+  genShapeSelect.appendChild(opt);
+});
+function rebuildGenParams(){
+  const container = document.getElementById('genParams');
+  container.innerHTML = '';
+  const def = SHAPE_DEFS[genShapeSelect.value];
+  Object.entries(def.params).forEach(([key,val])=>{
+    const label = document.createElement('label');
+    label.className = 'field';
+    label.innerHTML = `${key}<input type="number" step="1" value="${val}" data-param="${key}">`;
+    container.appendChild(label);
+  });
+}
+genShapeSelect.addEventListener('change', rebuildGenParams);
+rebuildGenParams();
+
+document.getElementById('btnGenerate').addEventListener('click', ()=>{
+  const def = SHAPE_DEFS[genShapeSelect.value];
+  const params = {};
+  document.querySelectorAll('#genParams input').forEach(inp=>{
+    params[inp.dataset.param] = parseFloat(inp.value) || 0;
+  });
+  params.count = Math.max(1, Math.round(params.count||1));
+  const pts = def.gen(params).map(p=>({id:nextId(), x:p.x, y:p.y, z:p.z}));
+  const f = { id: nextId(), name: `${def.label} (generated)`, points: pts };
+  state.formations.push(f);
+  selectFormation(f.id);
+});
+
+/* =========================================================================
+   TOP BAR ACTIONS
+   ========================================================================= */
+document.getElementById('btnNewFormation').addEventListener('click', newFormation);
+
+document.getElementById('btnImportToggle').addEventListener('click', ()=>{
+  document.getElementById('importPanel').classList.toggle('hidden');
+});
+document.getElementById('btnImportAppend').addEventListener('click', ()=>{
+  const text = document.getElementById('importText').value;
+  const parsed = parseFormationsXML(text);
+  if (!parsed.length){ alertStatus('No valid formations found in the pasted text.'); return; }
+  state.formations.push(...parsed);
+  selectFormation(parsed[0].id);
+  document.getElementById('importText').value = '';
+});
+document.getElementById('btnImportReplace').addEventListener('click', ()=>{
+  const text = document.getElementById('importText').value;
+  const parsed = parseFormationsXML(text);
+  if (!parsed.length){ alertStatus('No valid formations found in the pasted text.'); return; }
+  state.formations = parsed;
+  selectFormation(parsed[0].id);
+  document.getElementById('importText').value = '';
+});
+
+let resetArmed = false;
+document.getElementById('btnResetLibrary').addEventListener('click', (e)=>{
+  if (!resetArmed){
+    resetArmed = true;
+    e.target.textContent = 'Click again to confirm';
+    setTimeout(()=>{ resetArmed=false; e.target.textContent='Reset library'; }, 3000);
+    return;
+  }
+  resetArmed = false;
+  e.target.textContent = 'Reset library';
+  state.formations = parseFormationsXML(INITIAL_XML);
+  state.selectedFormationId = state.formations[0]?.id ?? null;
+  state.selectedPointId = null;
+  fitView();
+  renderAll();
+});
+
+document.getElementById('btnExportAll').addEventListener('click', ()=>{
+  downloadText('squadron_formations.xml', serializeAll(state.formations));
+});
+
+function downloadText(filename, text){
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+
+function alertStatus(msg){
+  const bar = document.querySelector('.footer-status');
+  const prev = bar.textContent;
+  bar.textContent = msg;
+  setTimeout(()=>{ bar.textContent = prev; }, 3000);
+}
+
+/* =========================================================================
+   FORMATION NAME / SCALE / EXPORT BUTTONS
+   ========================================================================= */
+document.getElementById('formationName').addEventListener('input', (e)=>{
+  const f = getSelectedFormation();
+  if (!f) return;
+  f.name = e.target.value;
+  rebuildRosterList();
+  updateExportText();
+});
+
+document.getElementById('btnApplyScale').addEventListener('click', ()=>{
+  const f = getSelectedFormation();
+  if (!f) return;
+  const factor = parseFloat(document.getElementById('scaleFactor').value);
+  if (!factor || !isFinite(factor)) return;
+  f.points.forEach(p=>{ p.x = round1(p.x*factor); p.y = round1(p.y*factor); p.z = round1(p.z*factor); });
+  renderAll();
+});
+
+document.getElementById('btnAddPointOrigin').addEventListener('click', ()=>{
+  const f = getSelectedFormation();
+  if (!f) return;
+  const p = { id: nextId(), x:0, y:0, z:0 };
+  f.points.push(p);
+  state.selectedPointId = p.id;
+  renderAll();
+});
+
+document.getElementById('btnMirror').addEventListener('click', ()=>{
+  const f = getSelectedFormation();
+  const p = getSelectedPoint();
+  if (!f || !p) { alertStatus('Select a point first to mirror it.'); return; }
+  const clone = { id: nextId(), x: p.x, y: -p.y, z: p.z };
+  f.points.push(clone);
+  state.selectedPointId = clone.id;
+  renderAll();
+});
+
+document.getElementById('btnDeletePoint').addEventListener('click', ()=>{
+  const f = getSelectedFormation();
+  if (!f || !state.selectedPointId) return;
+  f.points = f.points.filter(p=>p.id!==state.selectedPointId);
+  state.selectedPointId = null;
+  renderAll();
+});
+
+document.getElementById('btnCopyXml').addEventListener('click', async ()=>{
+  const text = document.getElementById('exportText').value;
+  try { await navigator.clipboard.writeText(text); alertStatus('Copied to clipboard.'); }
+  catch(e){
+    const ta = document.getElementById('exportText');
+    ta.select(); document.execCommand('copy'); alertStatus('Copied to clipboard.');
+  }
+});
+document.getElementById('btnDownloadOne').addEventListener('click', ()=>{
+  const f = getSelectedFormation();
+  if (!f) return;
+  const fname = (f.name||'formation').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'formation';
+  downloadText(fname+'.xml', serializeFormation(f));
+});
+
+/* =========================================================================
+   VIEWPORT TOOLBAR
+   ========================================================================= */
+document.getElementById('btnFit').addEventListener('click', ()=>{ fitView(); renderCanvasesOnly(); });
+document.getElementById('btnZoomIn').addEventListener('click', ()=>{ state.scale=clamp(state.scale*1.25,0.05,5); renderCanvasesOnly(); });
+document.getElementById('btnZoomOut').addEventListener('click', ()=>{ state.scale=clamp(state.scale/1.25,0.05,5); renderCanvasesOnly(); });
+document.getElementById('btnAddMode').addEventListener('click', (e)=>{
+  state.addMode = !state.addMode;
+  e.target.textContent = 'Add point: ' + (state.addMode ? 'ON (click canvas)' : 'OFF');
+  e.target.classList.toggle('accent', state.addMode);
+  document.getElementById('topCanvas').style.cursor = state.addMode ? 'crosshair' : 'default';
+  document.getElementById('sideCanvas').style.cursor = state.addMode ? 'crosshair' : 'default';
+});
+
+/* =========================================================================
+   CANVAS INTERACTION
+   ========================================================================= */
+function getMousePos(e, canvas){
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function hitTestPoint(points, view, w, h, scale, proj, pos){
+  let best=null, bestDist=12;
+  points.forEach(p=>{
+    const s = proj(p, view, w, h, scale);
+    const d = Math.hypot(s.sx-pos.x, s.sy-pos.y);
+    if (d<bestDist){ bestDist=d; best=p; }
+  });
+  return best;
+}
+
+let drag = null;
+
+function attachCanvasEvents(canvas, kind){
+  const view = () => kind==='top' ? state.topView : state.sideView;
+  const proj = kind==='top' ? topProj : sideProj;
+
+  canvas.addEventListener('mousedown', (e)=>{
+    const f = getSelectedFormation(); if (!f) return;
+    const pos = getMousePos(e,canvas);
+    const w = canvas.getBoundingClientRect().width, h = canvas.getBoundingClientRect().height;
+    const hit = hitTestPoint(f.points, view(), w, h, state.scale, proj, pos);
+
+    if (state.addMode){
+      if (hit){ state.selectedPointId = hit.id; renderAll(); return; }
+      if (kind==='top'){
+        const wp = screenToWorldTop(pos, view(), w, h, state.scale);
+        const p = { id: nextId(), x: round1(wp.x), y: round1(wp.y), z: 0 };
+        f.points.push(p); state.selectedPointId = p.id;
+      } else {
+        const wp = screenToWorldSide(pos, view(), w, h, state.scale);
+        const p = { id: nextId(), x: round1(wp.x), y: 0, z: round1(wp.z) };
+        f.points.push(p); state.selectedPointId = p.id;
+      }
+      renderAll();
+      return;
+    }
+
+    if (hit){
+      state.selectedPointId = hit.id;
+      drag = { type:'point', kind, lastX:pos.x, lastY:pos.y };
+      renderAll();
+    } else {
+      drag = { type:'pan', kind, lastX:pos.x, lastY:pos.y };
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e)=>{
+    if (!drag || drag.kind!==kind) return;
+    const pos = getMousePos(e,canvas);
+    const dx = pos.x-drag.lastX, dy = pos.y-drag.lastY;
+    if (drag.type==='point'){
+      const f = getSelectedFormation();
+      const p = f && f.points.find(pp=>pp.id===state.selectedPointId);
+      if (p){
+        if (kind==='top'){ p.x = round1(p.x + (-dy/state.scale)); p.y = round1(p.y + (dx/state.scale)); }
+        else { p.x = round1(p.x + (dx/state.scale)); p.z = round1(p.z + (-dy/state.scale)); }
+        updatePointInputsLive(p);
+      }
+    } else if (drag.type==='pan'){
+      const v = view();
+      v.cx -= dx/state.scale;
+      v.cy += dy/state.scale;
+    }
+    drag.lastX=pos.x; drag.lastY=pos.y;
+    renderCanvasesOnly();
+  });
+
+  window.addEventListener('mouseup', ()=>{
+    if (drag && drag.type==='point'){ updateExportText(); }
+    drag = null;
+  });
+
+  canvas.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const factor = e.deltaY<0 ? 1.1 : 1/1.1;
+    state.scale = clamp(state.scale*factor, 0.05, 5);
+    renderCanvasesOnly();
+  }, { passive:false });
+}
+attachCanvasEvents(document.getElementById('topCanvas'),'top');
+attachCanvasEvents(document.getElementById('sideCanvas'),'side');
+
+function updatePointInputsLive(p){
+  document.querySelectorAll(`input[data-id="${p.id}"]`).forEach(inp=>{
+    inp.value = p[inp.dataset.axis];
+  });
+  document.getElementById('exportText').value = (()=>{ const f=getSelectedFormation(); return f?serializeFormation(f):''; })();
+}
+
+/* =========================================================================
+   KEYBOARD
+   ========================================================================= */
+window.addEventListener('keydown', (e)=>{
+  if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+  if (e.key==='Delete' || e.key==='Backspace'){
+    const f = getSelectedFormation();
+    if (f && state.selectedPointId){
+      f.points = f.points.filter(p=>p.id!==state.selectedPointId);
+      state.selectedPointId = null;
+      renderAll();
+      e.preventDefault();
+    }
+  }
+});
+
+/* =========================================================================
+   RESIZE + AMBIENT REFRESH (leader pulse) — canvases only, never touches DOM lists
+   ========================================================================= */
+window.addEventListener('resize', renderCanvasesOnly);
+if (!prefersReducedMotion){
+  setInterval(renderCanvasesOnly, 70);
+}
+
+/* =========================================================================
+   BOOT
+   ========================================================================= */
+fitView();
+renderAll();
+</script>
+</body>
+</html>
