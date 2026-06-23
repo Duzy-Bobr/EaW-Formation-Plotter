@@ -599,7 +599,7 @@ function undo(){
   if (!undoStack.length) return;
   redoStack.push(JSON.stringify(state.formations));
   state.formations = JSON.parse(undoStack.pop());
-  // re-assign IDs aren't needed since we serialize with IDs
+  // IDs don't need re-assignment since we serialize with IDs
   if (state.selectedFormationId && !state.formations.find(f=>f.id===state.selectedFormationId)){
     state.selectedFormationId = state.formations.length ? state.formations[0].id : null;
     state.selectedPointId = null;
